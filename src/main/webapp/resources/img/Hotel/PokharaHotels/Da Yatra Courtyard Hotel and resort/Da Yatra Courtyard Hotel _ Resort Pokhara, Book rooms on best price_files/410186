@@ -1,0 +1,219 @@
+
+
+    
+        (function(){
+            if (typeof (HCSB) == 'undefined') {
+    HCSB = {
+        _options: [],
+        _scriptLoaded: false,
+        _domLoaded: false,
+        _domLoadInit: false,
+        _sbExternalConfiguration: {},
+
+        loadCSS: function (id, href, appendOrInsertBefore) {
+            appendOrInsertBefore = (typeof appendOrInsertBefore === "undefined") ? "i" : appendOrInsertBefore;
+
+            if (!document.getElementById(id)) {
+                var css = document.createElement("link");
+                css.type = "text/css";
+                css.rel = "stylesheet";
+                css.href = href;
+                css.id = id;
+                var link;
+
+                if (appendOrInsertBefore == "i") {
+                    link = document.getElementsByTagName("link")[0];
+                    if (link) {
+                        link.parentNode.insertBefore(css, link);
+                    }
+                }
+
+                if (!link || appendOrInsertBefore == "a") {
+                    document.getElementsByTagName("head")[0].appendChild(css);
+                }
+            }
+        },
+
+        loadScript: function (id, src) {
+            // load the main JS library..
+            if (!document.getElementById(id)) {
+                // create script
+                var js = document.createElement("script");
+                js.src = src;
+                js.id = id;
+
+                // bind load event
+                if (js.addEventListener) {
+                    js.addEventListener('load', function () {
+                        HCSB._scriptLoaded = true;
+                        HCSB.executeCallBack();
+
+                    }, false);
+                }
+                else {
+                    // old IE < 9
+                    js.onreadystatechange = function () {
+                        if (js.readyState in { loaded: 1, complete: 1 }) {
+                            js.onreadystatechange = null;
+                            HCSB._scriptLoaded = true;
+                            HCSB.executeCallBack();
+                        }
+                    };
+                }
+
+                // insert script
+                var pjs = document.getElementsByTagName("script")[0];
+                pjs.parentNode.insertBefore(js, pjs);
+            }
+        },
+
+
+        executeCallBack: function () {
+            if (HCSB._scriptLoaded && HCSB._domLoaded) {
+                for (var i = 0; i < HCSB._options.length; i++) {
+                    HCSB.callBack(HCSB._options[i]);
+                }
+            }
+        },
+
+        callBack: function (options) {
+            var searchBox = new HCSB_SearchBox;
+
+            var configuration = this._sbExternalConfiguration[options.SbID];
+            options.externalConfiguration = configuration;
+
+            searchBox.init(options);
+        },
+
+        initDOMLoadEvent: function () {
+            //  our load event
+            var loadFunc = function() {
+                HCSB._domLoaded = true;
+                HCSB.executeCallBack();
+            };
+
+            if (document.readyState) {
+
+                if (document.readyState !== "complete") {
+                    if (document.onreadystatechange !== undefined) {
+                        if (this._domLoadInit !== true) {
+                            this._domLoadInit = true;
+
+                            var event = function () {
+                                if (document.readyState === "complete" ||
+                                    document.readyState === "interactive") {
+                                    document.onreadystatechange = null;
+                                    loadFunc();
+                                    document.removeEventListener("readystatechange", event);
+                                }
+                            }
+
+                            document.addEventListener("readystatechange", event);
+                        }
+                    } else { //firefox 3.6 and below problem where onreadystatechange is undefined
+                        if (this._domLoadInit !== true) {
+                            this._domLoadInit = true;
+                            document.addEventListener('DOMContentLoaded', function () {
+                                loadFunc();
+                            }, false);
+                        }
+                    }
+                } else {
+                    loadFunc();
+                }
+            }
+            else {
+                 if (this._domLoadInit !== true) {
+                    this._domLoadInit = true;
+                    //Others
+                    document.onload = function () {
+                        loadFunc();
+                    };
+                }
+            }
+        },
+
+        buildSB: function (options, html, css) {
+            this.loadResources(options);
+            this._options.push(options);
+            var j = document.getElementsByTagName("script");
+            var i = j.length;
+
+            for (var k = 0; k < i; k++) {
+                //find script tag by its src url to determine where to write out search box, add done parameter in the src to identify which sb has loaded
+                if (j[k].src && j[k].src.toLowerCase().indexOf("/searchbox/" + options.SbID) > -1) {
+
+                    if (j[k].src.indexOf("&done") != -1 || j[k].src.indexOf("?done") != -1)
+                        return;
+
+                    //write search box css to page
+                    if (!document.getElementById("hcsbcss_" + options.uiid)) {
+                        var cssContainer = document.createElement("style");
+                        cssContainer.setAttribute("id", "hcsbcss_" + options.uiid);
+                        cssContainer.type = 'text/css';
+
+                        if (cssContainer.styleSheet) {
+                            cssContainer.styleSheet.cssText = css.css;
+                        } else {
+                            cssContainer.innerHTML = css.css;
+                        }
+
+                        document.getElementsByTagName("head")[0].appendChild(cssContainer);
+                    }
+
+                    //write search box html to page
+                    if (!document.getElementById('SB_' + options.uiid)) {
+                        var container = document.createElement("div");
+                        container.setAttribute("id", 'SB_' + options.uiid);
+                        container.setAttribute("class", options.searchBoxContainerCssClass);
+                        if (options.layout) {
+                            container.setAttribute("class", options.containerLayoutClass);
+                        }
+
+                        html = html.Html.replace("\u003c", "<");
+                        html = html.replace("\u003e", ">");
+
+                        container.innerHTML = html;
+
+                        //targeted placement?
+                        if (options.target) {
+                            var targetContainer = document.getElementById(options.target);
+                            if (targetContainer) {
+                                targetContainer.appendChild(container);
+                            }
+                        }
+                        else {
+                            j[k].parentNode.insertBefore(container, j[k]);
+                        }
+                    }
+
+                    j[k].setAttribute("src", j[k].src + (j[k].src.indexOf('?') == -1 ? "?done" : "&done"));
+                }
+            }
+            options.referrer = document.referrer;
+            this.initDOMLoadEvent();
+
+        },
+
+        //load all external resources ie scripts, css etc
+        loadResources: function (options) {
+            this.loadScript("hcsb_extref", "//" + options.scriptResourceUrl);
+            this.loadCSS("hcsb_sbcss", "//" + options.cssResourceUrl);
+        },
+
+        sbExternalConfiguration: function (sbid, options) {
+            this._sbExternalConfiguration[sbid] = options;
+        }
+    };
+}
+            var html = "\u003cdiv class=\"hcsb_outer \"\u003e\r\n    \u003ch2 class=\"hcsb_topTitle\"\u003eDa Yatra Courtyard\u003c/h2\u003e\r\n    \u003cdiv class=\"hcsb_content\"\u003e\r\n        \u003cfieldset\u003e\r\n            \u003cdiv class=\"hcsb_checkinDateWrapper hcsb_clearfix\"\u003e\r\n                \u003clabel class=\"hcsb_checkinDateLabel\"\u003eCheck-in\u003c/label\u003e\r\n                \u003cdiv class=\"hcsb_checkinDateContent\"\u003e\r\n                    \u003cinput type=\"hidden\" id=\"CHECKIN-SB_c8a7ae6a94\" class=\"hcsb_checkinDate\"/\u003e\r\n\r\n\r\n\u003cselect class=\"hcsb_checkinDay\" data-val=\"true\" data-val-number=\"The field Day must be a number.\" data-val-required=\"The Day field is required.\" id=\"CHECKIND-SB_c8a7ae6a94\" name=\"Day\"\u003e\u003coption value=\"-1\"\u003eDay\u003c/option\u003e\r\n\u003coption value=\"1\"\u003eWed 1\u003c/option\u003e\r\n\u003coption value=\"2\"\u003eThu 2\u003c/option\u003e\r\n\u003coption value=\"3\"\u003eFri 3\u003c/option\u003e\r\n\u003coption value=\"4\"\u003eSat 4\u003c/option\u003e\r\n\u003coption value=\"5\"\u003eSun 5\u003c/option\u003e\r\n\u003coption value=\"6\"\u003eMon 6\u003c/option\u003e\r\n\u003coption value=\"7\"\u003eTue 7\u003c/option\u003e\r\n\u003coption value=\"8\"\u003eWed 8\u003c/option\u003e\r\n\u003coption value=\"9\"\u003eThu 9\u003c/option\u003e\r\n\u003coption value=\"10\"\u003eFri 10\u003c/option\u003e\r\n\u003coption value=\"11\"\u003eSat 11\u003c/option\u003e\r\n\u003coption value=\"12\"\u003eSun 12\u003c/option\u003e\r\n\u003coption value=\"13\"\u003eMon 13\u003c/option\u003e\r\n\u003coption value=\"14\"\u003eTue 14\u003c/option\u003e\r\n\u003coption value=\"15\"\u003eWed 15\u003c/option\u003e\r\n\u003coption value=\"16\"\u003eThu 16\u003c/option\u003e\r\n\u003coption value=\"17\"\u003eFri 17\u003c/option\u003e\r\n\u003coption value=\"18\"\u003eSat 18\u003c/option\u003e\r\n\u003coption value=\"19\"\u003eSun 19\u003c/option\u003e\r\n\u003coption value=\"20\"\u003eMon 20\u003c/option\u003e\r\n\u003coption value=\"21\"\u003eTue 21\u003c/option\u003e\r\n\u003coption value=\"22\"\u003eWed 22\u003c/option\u003e\r\n\u003coption value=\"23\"\u003eThu 23\u003c/option\u003e\r\n\u003coption value=\"24\"\u003eFri 24\u003c/option\u003e\r\n\u003coption value=\"25\"\u003eSat 25\u003c/option\u003e\r\n\u003coption value=\"26\"\u003eSun 26\u003c/option\u003e\r\n\u003coption value=\"27\"\u003eMon 27\u003c/option\u003e\r\n\u003coption value=\"28\"\u003eTue 28\u003c/option\u003e\r\n\u003coption value=\"29\"\u003eWed 29\u003c/option\u003e\r\n\u003coption value=\"30\"\u003eThu 30\u003c/option\u003e\r\n\u003coption value=\"31\"\u003eFri 31\u003c/option\u003e\r\n\u003c/select\u003e\u003cselect class=\"hcsb_checkinMonth\" data-val=\"true\" data-val-number=\"The field Month must be a number.\" data-val-required=\"The Month field is required.\" id=\"CHECKINM-SB_c8a7ae6a94\" name=\"Month\"\u003e\u003coption value=\"-1\"\u003eMonth\u003c/option\u003e\r\n\u003coption value=\"2018-8\"\u003eAugust \u0026#39;18\u003c/option\u003e\r\n\u003coption value=\"2018-9\"\u003eSeptember \u0026#39;18\u003c/option\u003e\r\n\u003coption value=\"2018-10\"\u003eOctober \u0026#39;18\u003c/option\u003e\r\n\u003coption value=\"2018-11\"\u003eNovember \u0026#39;18\u003c/option\u003e\r\n\u003coption value=\"2018-12\"\u003eDecember \u0026#39;18\u003c/option\u003e\r\n\u003coption value=\"2019-1\"\u003eJanuary \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-2\"\u003eFebruary \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-3\"\u003eMarch \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-4\"\u003eApril \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-5\"\u003eMay \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-6\"\u003eJune \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-7\"\u003eJuly \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-8\"\u003eAugust \u0026#39;19\u003c/option\u003e\r\n\u003c/select\u003e\r\n                \u003c/div\u003e\r\n            \u003c/div\u003e\r\n            \u003cdiv class=\"hcsb_checkoutDateWrapper hcsb_clearfix\"\u003e\r\n                \u003clabel class=\"hcsb_checkoutDateLabel\"\u003eCheck-out\u003c/label\u003e\r\n                \u003cdiv class=\"hcsb_checkoutDateContent\"\u003e\r\n                    \u003cinput type=\"hidden\" id=\"CHECKOUT-SB_c8a7ae6a94\"  class=\"hcsb_checkoutDate\"/\u003e\r\n\r\n\r\n\u003cselect class=\"hcsb_checkoutDay\" data-val=\"true\" data-val-number=\"The field Day must be a number.\" data-val-required=\"The Day field is required.\" id=\"CHECKOUTD-SB_c8a7ae6a94\" name=\"Day\"\u003e\u003coption value=\"-1\"\u003eDay\u003c/option\u003e\r\n\u003coption value=\"1\"\u003eWed 1\u003c/option\u003e\r\n\u003coption value=\"2\"\u003eThu 2\u003c/option\u003e\r\n\u003coption value=\"3\"\u003eFri 3\u003c/option\u003e\r\n\u003coption value=\"4\"\u003eSat 4\u003c/option\u003e\r\n\u003coption value=\"5\"\u003eSun 5\u003c/option\u003e\r\n\u003coption value=\"6\"\u003eMon 6\u003c/option\u003e\r\n\u003coption value=\"7\"\u003eTue 7\u003c/option\u003e\r\n\u003coption value=\"8\"\u003eWed 8\u003c/option\u003e\r\n\u003coption value=\"9\"\u003eThu 9\u003c/option\u003e\r\n\u003coption value=\"10\"\u003eFri 10\u003c/option\u003e\r\n\u003coption value=\"11\"\u003eSat 11\u003c/option\u003e\r\n\u003coption value=\"12\"\u003eSun 12\u003c/option\u003e\r\n\u003coption value=\"13\"\u003eMon 13\u003c/option\u003e\r\n\u003coption value=\"14\"\u003eTue 14\u003c/option\u003e\r\n\u003coption value=\"15\"\u003eWed 15\u003c/option\u003e\r\n\u003coption value=\"16\"\u003eThu 16\u003c/option\u003e\r\n\u003coption value=\"17\"\u003eFri 17\u003c/option\u003e\r\n\u003coption value=\"18\"\u003eSat 18\u003c/option\u003e\r\n\u003coption value=\"19\"\u003eSun 19\u003c/option\u003e\r\n\u003coption value=\"20\"\u003eMon 20\u003c/option\u003e\r\n\u003coption value=\"21\"\u003eTue 21\u003c/option\u003e\r\n\u003coption value=\"22\"\u003eWed 22\u003c/option\u003e\r\n\u003coption value=\"23\"\u003eThu 23\u003c/option\u003e\r\n\u003coption value=\"24\"\u003eFri 24\u003c/option\u003e\r\n\u003coption value=\"25\"\u003eSat 25\u003c/option\u003e\r\n\u003coption value=\"26\"\u003eSun 26\u003c/option\u003e\r\n\u003coption value=\"27\"\u003eMon 27\u003c/option\u003e\r\n\u003coption value=\"28\"\u003eTue 28\u003c/option\u003e\r\n\u003coption value=\"29\"\u003eWed 29\u003c/option\u003e\r\n\u003coption value=\"30\"\u003eThu 30\u003c/option\u003e\r\n\u003coption value=\"31\"\u003eFri 31\u003c/option\u003e\r\n\u003c/select\u003e\u003cselect class=\"hcsb_checkoutMonth\" data-val=\"true\" data-val-number=\"The field Month must be a number.\" data-val-required=\"The Month field is required.\" id=\"CHECKOUTM-SB_c8a7ae6a94\" name=\"Month\"\u003e\u003coption value=\"-1\"\u003eMonth\u003c/option\u003e\r\n\u003coption value=\"2018-8\"\u003eAugust \u0026#39;18\u003c/option\u003e\r\n\u003coption value=\"2018-9\"\u003eSeptember \u0026#39;18\u003c/option\u003e\r\n\u003coption value=\"2018-10\"\u003eOctober \u0026#39;18\u003c/option\u003e\r\n\u003coption value=\"2018-11\"\u003eNovember \u0026#39;18\u003c/option\u003e\r\n\u003coption value=\"2018-12\"\u003eDecember \u0026#39;18\u003c/option\u003e\r\n\u003coption value=\"2019-1\"\u003eJanuary \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-2\"\u003eFebruary \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-3\"\u003eMarch \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-4\"\u003eApril \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-5\"\u003eMay \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-6\"\u003eJune \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-7\"\u003eJuly \u0026#39;19\u003c/option\u003e\r\n\u003coption value=\"2019-8\"\u003eAugust \u0026#39;19\u003c/option\u003e\r\n\u003c/select\u003e\r\n                \u003c/div\u003e\r\n            \u003c/div\u003e\r\n            \u003cdiv class=\"hcsb_noDatesWrapper\"\u003e\r\n                \u003cinput type=\"checkbox\" id=\"NODATE-SB_c8a7ae6a94\" class=\"hcsb_noDate\" /\u003e\r\n                \u003clabel class=\"hcsb_noDatesLabel\" for=\"NODATE-SB_c8a7ae6a94\"\u003eI don\u0026#39;t have specific dates yet\u003c/label\u003e\r\n            \u003c/div\u003e\r\n            \u003cdiv class=\"hcsb_guestsRoomsWrapper\"\u003e\r\n                \u003clabel class=\"hcsb_guestsLabel\"\u003eGuests\u003c/label\u003e\r\n                \u003cselect id=\"G-SB_c8a7ae6a94\" class=\"hcsb_guests\"\u003e\r\n                    \u003coption value=\"1-1\"\u003e1 adult\u003c/option\u003e\r\n                    \u003coption selected=\"selected\" value=\"2-1\"\u003e2 adults in 1 room\u003c/option\u003e\r\n                    \u003coption value=\"3-1\"\u003e3 adults in 1 room\u003c/option\u003e\r\n                    \u003coption value=\"4-1\"\u003e4 adults in 1 room\u003c/option\u003e\r\n                    \u003coption value=\"2-2\"\u003e2 adults in 2 rooms\u003c/option\u003e\r\n                    \u003coption value=\"0\"\u003eMore options...\u003c/option\u003e\r\n                \u003c/select\u003e\r\n            \u003c/div\u003e\r\n            \u003ca id=\"SB-SB_c8a7ae6a94\" class=\"hcsb_searchButton\"\u003eSearch\u003c/a\u003e\r\n        \u003c/fieldset\u003e\r\n        \u003cdiv class=\"hcsb_anchor\"\u003e\u003c/div\u003e\r\n    \u003c/div\u003e\r\n        \u003cimg class=\"hcsb_poweredBy\" src=\"//sbhc.portalhc.com/SearchBox/Image/Light/poweredby_hotelscombined.png?cdn=1.0.2018.213003-C677a6acc5f65d755dbf05ca10421c8b77470f326\" alt=\"\" /\u003e\r\n\u003c/div\u003e\r\n\r\n";
+            var options = {"SbID":410186,"languageCode":"EN","uiid":"c8a7ae6a94","affiliateId":185074,"brandId":541915,"brandType":0,"brandLanguageCode":"EN","siteID":1,"domain":"www.hotelscombined.com","openNewWindow":false,"destination":"hotel:Da_Yatra_Courtyard","defaultTitle":"Da Yatra Courtyard","displayPoweredByLogo":true,"searchBoxType":2,"label":"Da Yatra Courtyard Hotel & Resort","autoComplete":false,"sbScriptRenderUrl":"https://sbhc.portalhc.com/185074/SearchBox/410186?hotelID=0&done","calendar":{"closeText":"close","prevText":"Prev","nextText":"Next","currentText":"Today","monthNames":["January","February","March","April","May","June","July","August","September","October","November","December"],"monthNamesShort":["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],"dayNames":["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],"dayNamesShort":["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],"dayNamesMin":["Su","Mo","Tu","We","Th","Fr","Sa"],"weekHeader":"Wk","dateFormat":"yy-mm-dd","firstDay":0,"isRTL":false,"showMonthAfterYear":true,"yearSuffix":"","dayHelpText":"Day","showDayAfterMonth":false,"dayDropdownFormat":"[NameShort] [Day]","monthDropdownFormat":"[Month] '[YearShort]","datedropdownMonthYearLongFormat":"[InsertMonthName] [InsertYear]"},"translations":{"dateError":"Please enter your Check-in and Check-out dates","citySearchHintError":"Please provide either a city, region, country, landmark, hotel, or district","roomConfigEnterAllAges":"Please enter all ages of children","roomConfigEnterAgeOfChild":"Please enter age of child","roomConfigAgesBetween":"All ages must be between 0 and 17 inclusive","roomConfigAtLeast1Adult1Child":"Please enter at least 1 adult or 1 child","adultHelpText":"Adults","roomHelpText":"Room [InsertRoomNumber]:","childrenHelpText":"Children","childrenAgeHelpText":"Age of Children","missingAgeError":"Please enter all ages of children","ageError":"All ages must be between 0 and 17 inclusive","submit":"Submit","periodOfStayError":"Your period of stay should be no longer than 30 nights.","addRoom":"Add another room","remove":"remove","noGuestsInRoom":"Please enter at least 1 adult or 1 child","autoSuggestionMoreOptions":"Search more options for '[InsertTerm]'","checkOutBeforeCheckIn":"Please ensure that the Check-out date is after the Check-in date.","checkoutCheckinInFuture":"Please ensure that the Check-in and Check-out dates are in the future.","isRtl":false,"bookWithinOneYear":"You cannot book more than 1 year in advance"},"requestDomain":"sbhc.portalhc.com","hotelID":0,"fontSizeConfiguration":"hcsb_font_heading_size|20,hcsb_font_label_size|14,hcsb_font_input_size|15,hcsb_font_error_size|12,hcsb_font_button_size|22","fontFamily":"arial,verdana,helvetica,sans-serif","IsPreview":false,"templateVersion":"v1","templateStyle":"v5.css","searchBoxContainerCssClass":"hcsb_container hcsb_ac","colourTheme":"hcsb_backgroundcolor|#2C4162,hcsb_f_bordercolor|#FFFFFF,hcsb_f_backgroundcolor|#2C4162,hcsb_f_i_color|#4E4E4E,hcsb_f_i_backgroundcolor|#FFFFFF,hcsb_f_i_bordercolor|#ACADB2,hcsb_f_lbl_color|#FFFFFF,hcsb_hd_color|#FFFFFF,hcsb_hd_backgroundcolor|transparent,hcsb_btn_color|#FFFFFF,hcsb_btn_backgroundcolor|#39B54A,hcsb_hd_cal_backgroundcolor|#2C4162","height":0,"width":0,"scriptResourceUrl":"sbhc.portalhc.com/Script/JsMapper.ashx?key=/areas/responsivesearchbox.js&cdn=1.0.2018.213003-C677a6acc5f65d755dbf05ca10421c8b77470f326","cssResourceUrl":"sbhc.portalhc.com/SearchBox/Style/hc_searchbox.css?cdn=1.0.2018.213003-C677a6acc5f65d755dbf05ca10421c8b77470f326","isMobile":false,"isResponsive":true,"roomsInline":true,"turnOnPoweredByLogo":false,"UtcNow":"2018-08-02T15:23:01.0831877Z","UtcNowDay":2,"UtcNowMonth":8,"UtcNowYear":2018,"ImageSet":"Light","destinationTextHint":"e.g. city, region, district or specific hotel","containerLayoutClass":""}
+            var css = "#SB_c8a7ae6a94,#SB_c8a7ae6a94 div,#SB_c8a7ae6a94 h1,#SB_c8a7ae6a94 h2,#SB_c8a7ae6a94 fieldset,#SB_c8a7ae6a94 span,#SB_c8a7ae6a94 img,#SB_c8a7ae6a94 label,#SB_c8a7ae6a94 select,#EX-SB_c8a7ae6a94,#EX-SB_c8a7ae6a94 div,#EX-SB_c8a7ae6a94 h1,#EX-SB_c8a7ae6a94 h2,#EX-SB_c8a7ae6a94 fieldset,#EX-SB_c8a7ae6a94 span,#EX-SB_c8a7ae6a94 img,#EX-SB_c8a7ae6a94 label,#EX-SB_c8a7ae6a94 select{padding:0;margin:0;font-size:13px;font-weight:normal;font-family:arial,verdana,helvetica,sans-serif;vertical-align:baseline;border:0;background:none;color:#333;text-align:left;line-height:normal;float:none;position:relative;list-style:none;text-indent:0;top:auto;left:auto;bottom:auto;right:auto;-o-box-shadow:none;-moz-box-shadow:none;-webkit-box-shadow:none;box-shadow:none;-o-border-radius:0;-moz-border-radius:0;-webkit-border-radius:0;border-radius:0;-ms-filter:none;filter:none}#SB_c8a7ae6a94 span,#SB_c8a7ae6a94 img,#SB_c8a7ae6a94 select,#EX-SB_c8a7ae6a94 select,#EX-SB_c8a7ae6a94 span{display:inline;white-space:nowrap}#SB_c8a7ae6a94,#SB_c8a7ae6a94 div,#SB_c8a7ae6a94 h1,#SB_c8a7ae6a94 h2,#SB_c8a7ae6a94 fieldset,#EX-SB_c8a7ae6a94,#EX-SB_c8a7ae6a94 div,#EX-SB_c8a7ae6a94 h1,#EX-SB_c8a7ae6a94 h2,#EX-SB_c8a7ae6a94 fieldset{display:block}#SB_c8a7ae6a94 a,#SB_c8a7ae6a94 a:link,#SB_c8a7ae6a94 a:hover,#SB_c8a7ae6a94 a:visited,#SB_c8a7ae6a94 a:active,#SB_c8a7ae6a94 a,#SB_c8a7ae6a94 a:link,#SB_c8a7ae6a94 a:hover,#SB_c8a7ae6a94 a:visited,#SB_c8a7ae6a94 a:active,#SB_c8a7ae6a94 a img{display:inline;float:none;padding:0;margin:0;position:relative;top:auto;left:auto;right:auto;bottom:auto;color:#333;font-size:13px;font-weight:normal;font-family:arial,verdana,helvetica,sans-serif;border:none;line-height:normal;text-decoration:underline;background:none;-o-box-shadow:none;-moz-box-shadow:none;-webkit-box-shadow:none;box-shadow:none;-o-border-radius:0;-moz-border-radius:0;-webkit-border-radius:0;border-radius:0;-ms-filter:none;filter:none}#SB_c8a7ae6a94 input,#EX-SB_c8a7ae6a94 input{font-size:13px;font-weight:normal;font-family:arial,verdana,helvetica,sans-serif;padding:0;margin:0;display:inline;position:relative;top:auto;left:auto;bottom:auto;right:auto;text-indent:0;-o-box-shadow:none;-moz-box-shadow:none;-webkit-box-shadow:none;box-shadow:none;-o-border-radius:0;-moz-border-radius:0;-webkit-border-radius:0;border-radius:0;-ms-filter:none;filter:none}#SB_c8a7ae6a94 h1,#SB_c8a7ae6a94 h2{font-size:20px;font-weight:bold;color:#fff;background:transparent}#SB_c8a7ae6a94 label,#EX-SB_c8a7ae6a94 label{font-size:14px;color:#fff;display:inline}#SB_c8a7ae6a94 input,#SB_c8a7ae6a94 select,#EX-SB_c8a7ae6a94 input,#EX-SB_c8a7ae6a94 select{font-size:15px;border:1px solid #acadb2;color:#4e4e4e;background-color:#fff;border-radius:2px;-o-border-radius:2px;-moz-border-radius:2px;-webkit-border-radius:2px}#SB_c8a7ae6a94 a.hcsb_searchButton,#SB_c8a7ae6a94 a.hcsb_searchButton:hover{font-size:22px;background-color:#39b54a;font-weight:bold;color:#fff;text-align:center;text-decoration:none;display:block;margin-top:.75em;border-radius:2px;-o-border-radius:2px;-moz-border-radius:2px;-webkit-border-radius:2px;cursor:pointer;padding:.5em 0}#EX-SB_c8a7ae6a94 .hcsb_error{font-size:12px;border-radius:3px;-o-border-radius:3px;-moz-border-radius:3px;-webkit-border-radius:3px;background-color:#900;color:#fff}#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-widget-header{background-color:#2c4162;border:none;height:2em}#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-state-hover,#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-widget-content .ui-state-hover,#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-widget-header .ui-state-hover,#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-state-focus,#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-widget-content .ui-state-focus,#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-widget-header .ui-state-focus{background-image:none}#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-state-hover,#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-widget-content .ui-state-hover,#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-widget-header .ui-state-hover,#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-state-focus,#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-widget-content .ui-state-focus,#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-widget-header .ui-state-focus{background-color:#39b54a;color:#fff}#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-widget-header .ui-datepicker-title .ui-datepicker-year,#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-widget-header .ui-datepicker-title .ui-datepicker-month{display:inline;border:0}#hcsb_bodyElements .dp-SB_c8a7ae6a94.ui-corner-all,#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-corner-right,#hcsb_bodyElements .dp-SB_c8a7ae6a94 .ui-corner-left{border-radius:0}#hcsb_bodyElements .ui-autocomplete .ui-state-hover{background-color:#39b54a}#SB_c8a7ae6a94{position:relative;z-index:500;overflow:hidden;background-color:#2c4162;background-position:center center;background-repeat:no-repeat;display:none}#SB_c8a7ae6a94 .hcsb_outer{padding:0 13px 13px;overflow:hidden}#SB_c8a7ae6a94 .hcsb_content{position:relative;overflow:hidden;text-align:left;background-color:#2c4162;padding:0;border:0;border-radius:3px;-o-border-radius:3px;-moz-border-radius:3px;-webkit-border-radius:3px}#SB_c8a7ae6a94 .hcsb_content fieldset{display:block;background-color:#2c4162}#SB_c8a7ae6a94 .hcsb_poweredBy{display:block;position:absolute;top:10px;right:8px;max-width:121px}#SB_c8a7ae6a94 h1.hcsb_topTitle,#SB_c8a7ae6a94 h2.hcsb_topTitle{padding:.3em 0;margin:.4em 0 0;border:0;border-radius:3px;-o-border-radius:3px;-moz-border-radius:3px;-webkit-border-radius:3px}#SB_c8a7ae6a94 .hcsb_citySearchWrapper{position:relative;padding-bottom:1.2em}#SB_c8a7ae6a94 .hcsb_citySearchLabel{padding-bottom:.5em;display:block}#SB_c8a7ae6a94 .hcsb_citySearch{box-sizing:border-box;padding:.75em 5px .75em 5px;width:100%;text-indent:.5em;text-indent:0}#SB_c8a7ae6a94 .hcsb_citySearch.hcsb_hint{color:#999!important}#SB_c8a7ae6a94 .hcsb_guests,#SB_c8a7ae6a94 .hcsb_checkinDay,#SB_c8a7ae6a94 .hcsb_checkinMonth,#SB_c8a7ae6a94 .hcsb_checkoutDay,#SB_c8a7ae6a94 .hcsb_checkoutMonth{padding:5px 2px;font-size:1em;width:auto;margin:.1em .15em 0;padding:0 0 0 2px;*padding:0;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;box-sizing:border-box;border:1px solid #cfd8dc;border-radius:2px;-o-border-radius:2px;-moz-border-radius:2px;-webkit-border-radius:2px;line-height:2.1em;height:2.1em;color:#263238;background:#fff;-moz-box-shadow:none;-webkit-box-shadow:none;box-shadow:none}#SB_c8a7ae6a94 .hcsb_checkinMonth,#SB_c8a7ae6a94 .hcsb_checkoutMonth{-webkit-box-flex:1;-moz-box-flex:1;min-width:20%;-webkit-flex:1;-ms-flex:1;flex:1}#SB_c8a7ae6a94 .hcsb_guests{width:100%;margin:.1em 0}#SB_c8a7ae6a94 .hcsb_guests[disabled]{color:#ccc}#SB_c8a7ae6a94 .hcsb_checkinDateLabel,#SB_c8a7ae6a94 .hcsb_checkoutDateLabel{padding-bottom:.5em;display:block}#SB_c8a7ae6a94 .hcsb_checkinDateContent,#SB_c8a7ae6a94 .hcsb_checkoutDateContent{padding-bottom:1.2em;display:-webkit-box;display:-moz-box;display:-ms-flexbox;display:-webkit-flex;display:flex}#SB_c8a7ae6a94 .hcsb_checkinDateContent img,#SB_c8a7ae6a94 .hcsb_checkoutDateContent img{display:inline-block;background:url(\"//cdn.datahc.com/SearchBox/Image/Light/hc_icon_calendar_modern.png?\");height:25px;width:25px;vertical-align:top;top:.2em;position:relative;overflow:hidden;cursor:pointer}#SB_c8a7ae6a94 .hcsb_checkinDateContent img:hover,#SB_c8a7ae6a94 .hcsb_checkoutDateContent img:hover{background-position:0 -25px}#SB_c8a7ae6a94 .hcsb_guestsLabel{padding-bottom:.5em;display:block}#SB_c8a7ae6a94 .hcsb_guests{font-size:1em}#SB_c8a7ae6a94 .hcsb_noDatesWrapper{padding:0 .25em 1.3em .25em}#SB_c8a7ae6a94 .hcsb_noDatesWrapper label{cursor:pointer;font-size:.9em;display:inline-block}#SB_c8a7ae6a94 .hcsb_noDate{margin-right:.5em;border:0;background-color:transparent}#EX-SB_c8a7ae6a94{position:absolute;z-index:501;background-color:#2c4162;border-radius:0 0 3px 3px;-o-border-radius:0 0 3px 3px;-moz-border-radius:0 0 3px 3px;-webkit-border-radius:0 0 3px 3px}#EX-SB_c8a7ae6a94 #EX-SB_c8a7ae6a94_inner{background-color:#2c4162;margin:0 10px 10px;padding-top:10px}#SB_c8a7ae6a94 #EX-SB_c8a7ae6a94_inner{border-style:none;background:none;padding:1.5em 0 0;margin:0}#EX-SB_c8a7ae6a94 .hcsb_roomsConfig{background-color:#2c4162;display:block;margin:0 5px 5px 5px;border-radius:3px;-o-border-radius:3px;-moz-border-radius:3px;-webkit-border-radius:3px}#EX-SB_c8a7ae6a94 .hcsb_roomsConfig fieldset{display:block;position:relative;padding:0 .5em;border:0;background-color:#2c4162;border-bottom:1px dotted #fff}#EX-SB_c8a7ae6a94 .hcsb_roomsConfig .hcsb_rcRoomLabel{display:block;padding:.75em 0 .5em}#EX-SB_c8a7ae6a94 .hcsb_roomsConfig .hcsb_rcAdultLabel,#EX-SB_c8a7ae6a94 .hcsb_roomsConfig .hcsb_rcChildrenLabel,#EX-SB_c8a7ae6a94 .hcsb_roomsConfig .hcsb_rcChildrenAgeLabel{font-size:.9em;font-weight:normal;display:inline-block;width:90px}#EX-SB_c8a7ae6a94 .hcsb_rcAdultsWrapper,#EX-SB_c8a7ae6a94 .hcsb_rcChildrenWrapper,#EX-SB_c8a7ae6a94 .hcsb_rcChildrenAgeWrapper{padding:0 0 1em}#EX-SB_c8a7ae6a94 .hcsb_rcChildrenAgeWrapper{display:none}#EX-SB_c8a7ae6a94 .hcsb_rcAdults,#EX-SB_c8a7ae6a94 .hcsb_rcChildren{padding:.4em}#EX-SB_c8a7ae6a94 .hcsb_rcChildrenAgeWrapper input{width:1.6em;margin-right:3px;padding:.3em .2em;text-align:center}#EX-SB_c8a7ae6a94 .hcsb_rcRoomRemove{padding:0 0 1em}#EX-SB_c8a7ae6a94 .hcsb_rcAddRoom{line-height:3em;height:3em;padding-left:.5em}#EX-SB_c8a7ae6a94 .hcsb_rcAddRoom a,#EX-SB_c8a7ae6a94 .hcsb_rcRoomRemove a{color:#fff}#EX-SB_c8a7ae6a94 .hcsb_disabled{opacity:.5;-ms-filter:\"alpha(opacity=50)\";filter:alpha(opacity=50);-khtml-opacity:.5;-moz-opacity:.5}#EX-SB_c8a7ae6a94 .hcsb_error{position:relative;width:auto;top:auto;left:auto;margin:4px}#EX-SB_c8a7ae6a94 .hcsb_errorIcon{display:none}#EX-SB_c8a7ae6a94 .hcsb_error em{display:block;padding:.5em}#SB_c8a7ae6a94 .hcsb_fieldError,#EX-SB_c8a7ae6a94 .hcsb_fieldError{border:1px solid #c00!important}#SB_c8a7ae6a94 .hcsb_rtl div,#SB_c8a7ae6a94 .hcsb_rtl p,#SB_c8a7ae6a94 .hcsb_rtl h1,#SB_c8a7ae6a94 .hcsb_rtl h2,#SB_c8a7ae6a94 .hcsb_rtl fieldset,#SB_c8a7ae6a94 .hcsb_rtl select,#SB_c8a7ae6a94 .hcsb_rtl input,#EX-SB_c8a7ae6a94 .hcsb_rtl div,#EX-SB_c8a7ae6a94 .hcsb_rtl p,#EX-SB_c8a7ae6a94 .hcsb_rtl h1,#EX-SB_c8a7ae6a94 .hcsb_rtl h2,#EX-SB_c8a7ae6a94 .hcsb_rtl fieldset,#EX-SB_c8a7ae6a94 .hcsb_rtl select,#EX-SB_c8a7ae6a94 .hcsb_rtl input,#EX-SB_c8a7ae6a94 .hcsb_rtl em{direction:rtl;text-align:right}#SB_c8a7ae6a94 .hcsb_rtl .hcsb_poweredBy{right:auto;left:8px}#SB_c8a7ae6a94 .hcsb_rtl .hcsb_citySearchLabel,#SB_c8a7ae6a94 .hcsb_rtl .hcsb_guestsLabel,#SB_c8a7ae6a94 .hcsb_rtl .hcsb_checkinDateLabel,#SB_c8a7ae6a94 .hcsb_rtl .hcsb_checkoutDateLabel,#EX-SB_c8a7ae6a94 .hcsb_rtl .hcsb_rcRoomLabel,#EX-SB_c8a7ae6a94 .hcsb_rtl .hcsb_rcAdultLabel,#EX-SB_c8a7ae6a94 .hcsb_rtl .hcsb_rcChildrenLabel,#EX-SB_c8a7ae6a94 .hcsb_rtl .hcsb_rcChildrenAgeLabel{direction:rtl;text-align:right}#SB_c8a7ae6a94 .hcsb_rtl .hcsb_noDate{margin:0 0 0 10px}#SB_c8a7ae6a94 .hcsb_rtl .hcsb_checkinMonth,#SB_c8a7ae6a94 .hcsb_rtl .hcsb_checkoutMonth{max-width:118px}#EX-SB_c8a7ae6a94 .hcsb_rtl .hcsb_rcAddRoom{padding:0 .5em 0 0}#EX-SB_c8a7ae6a94 .hcsb_rtl .hcsb_rcRoomRemove{float:left}#EX-SB_c8a7ae6a94 .hcsb_rtl .hcsb_rcChildrenAgeWrapper input{margin:0 0 0 3px}#EX-SB_c8a7ae6a94.hcsb_extend.inline{position:inherit}#EX-SB_c8a7ae6a94.hcsb_extend .hcsb_rcAdults,#EX-SB_c8a7ae6a94.hcsb_extend .hcsb_rcChildren{min-width:4em}#SB_c8a7ae6a94.hcsb_responsive_smallest{width:234px}#SB_c8a7ae6a94.hcsb_responsive_mobile .hcsb_checkinDateWrapper,#SB_c8a7ae6a94.hcsb_responsive_mobile .hcsb_checkoutDateWrapper{width:50%;float:left}#SB_c8a7ae6a94.hcsb_responsive_mobile .hcsb_guestsRoomsWrapper{width:50%;float:right;margin:0 0 1em 0}#SB_c8a7ae6a94.hcsb_responsive_mobile .hcsb_noDatesWrapper{width:47%;float:left;line-height:1em}#SB_c8a7ae6a94.hcsb_responsive_mobile .hcsb_searchButton{clear:both}#SB_c8a7ae6a94.hcsb_responsive_mobile .hcsb_rtl .hcsb_checkinDateWrapper,#SB_c8a7ae6a94.hcsb_responsive_mobile .hcsb_rtl .hcsb_checkoutDateWrapper{float:right}#SB_c8a7ae6a94.hcsb_responsive_mobile .hcsb_rtl .hcsb_guestsRoomsWrapper{float:left}#SB_c8a7ae6a94.hcsb_responsive_mobile .hcsb_rtl .hcsb_noDatesWrapper{float:right}#SB_c8a7ae6a94.hcsb_responsive_tablet .hcsb_checkinDateWrapper,#SB_c8a7ae6a94.hcsb_responsive_tablet .hcsb_checkoutDateWrapper{width:34%;float:left}#SB_c8a7ae6a94.hcsb_responsive_tablet .hcsb_guestsRoomsWrapper{width:32%;float:right;margin-bottom:2.4em}#SB_c8a7ae6a94.hcsb_responsive_tablet .hcsb_noDatesWrapper{position:absolute;bottom:3em}#SB_c8a7ae6a94.hcsb_responsive_tablet .hcsb_searchButton{clear:both}#SB_c8a7ae6a94.hcsb_responsive_tablet .hcsb_rtl .hcsb_checkinDateWrapper,#SB_c8a7ae6a94.hcsb_responsive_tablet .hcsb_rtl .hcsb_checkoutDateWrapper{float:right}#SB_c8a7ae6a94.hcsb_responsive_tablet .hcsb_rtl .hcsb_guestsRoomsWrapper{float:left}#SB_c8a7ae6a94.hcsb_responsive_desktop .hcsb_checkinDateWrapper,#SB_c8a7ae6a94.hcsb_responsive_desktop .hcsb_checkoutDateWrapper{width:22%;float:left}#SB_c8a7ae6a94.hcsb_responsive_desktop .hcsb_guestsRoomsWrapper{width:22%;float:left;margin-bottom:0}#SB_c8a7ae6a94.hcsb_responsive_desktop .hcsb_noDatesWrapper{position:absolute;left:0;bottom:0;padding:0}#SB_c8a7ae6a94.hcsb_responsive_desktop .hcsb_searchButton,#SB_c8a7ae6a94.hcsb_responsive_desktop .hcsb_searchButton:hover{clear:inherit;width:32%;float:right;line-height:.8em;height:.8em;margin:.8em 0 1em;box-sizing:content-box}#SB_c8a7ae6a94.hcsb_responsive_desktop .hcsb_rtl .hcsb_checkinDateWrapper,#SB_c8a7ae6a94.hcsb_responsive_desktop .hcsb_rtl .hcsb_checkoutDateWrapper{float:right}#SB_c8a7ae6a94.hcsb_responsive_desktop .hcsb_rtl .hcsb_guestsRoomsWrapper{float:right}#SB_c8a7ae6a94.hcsb_responsive_desktop .hcsb_rtl .hcsb_noDatesWrapper{right:0}#SB_c8a7ae6a94.hcsb_responsive_desktop .hcsb_rtl .hcsb_searchButton,#SB_c8a7ae6a94.hcsb_responsive_desktop .hcsb_rtl .hcsb_searchButton:hover{float:left})";
+
+            HCSB.buildSB(
+            options,
+            {"Html" : html}, 
+            {"css": css}
+            );   
+        })()
+    

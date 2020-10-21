@@ -1,0 +1,41 @@
+.pagination_nav {
+    padding: 20px 0px;
+}
+.page-numbers.current {
+	background-color: #38ccff;
+	color: #fff;
+}
+
+.page-numbers {
+	color: #111;
+	border: 0px;
+	font-size: 18px;
+	padding: 6px 15px;
+}
+
+.page-numbers:hover {
+    background-color: #38ccff;
+	color: #fff;
+}
+
+.ui_icon.pickerType {
+    display: inline-block;
+}
+
+
+.ui_icon.map-pin-fill:before {
+    content: "\e01a";
+}
+.ui_icon:before {
+    display: inline-block;
+    font-style: normal;
+    font-weight: normal;
+    font-variant: normal;
+    font-size: inherit;
+    line-height: 1;
+}
+
+.pagination_nav {
+    background: white !important;
+}
+

@@ -1,0 +1,86 @@
+/*
+Theme Name: nepalihotels
+Theme URI: http://underscores.me/
+Author: Rashna Maharjan
+Author URI: https://www.linkedin.com/in/rashna-maharjan-910121135/
+Description: Description
+Version: 1.0.0
+License: GNU General Public License v2 or later
+License URI: LICENSE
+Text Domain: nepalihotels
+Tags: custom-background, custom-logo, custom-menu, featured-images, threaded-comments, translation-ready
+
+This theme, like WordPress, is licensed under the GPL.
+Use it to make something cool, have fun, and share what you've learned with others.
+
+nepalihotels is based on Underscores http://underscores.me/, (C) 2012-2016 Automattic, Inc.
+Underscores is distributed under the terms of the GNU GPL v2 or later.
+
+Normalizing styles have been helped along thanks to the fine work of
+Nicolas Gallagher and Jonathan Neal http://necolas.github.io/normalize.css/
+*/
+
+.navbar-default .navbar-nav>.active>a {
+    background-color: rgba(0, 0, 0, 0.95) !important;
+}
+.entry-desc a.read_btn, .entry-desc .entry_meta span.meta_m i {
+    color: #38ccff !important;
+}
+span.caret {
+    display: none !important;
+}
+.pagination_nav .page-numbers {
+	color: #111;
+	border: 0px;
+	font-size: 18px;
+	padding: 6px 15px;
+}
+.page-numbers.current {
+	background-color: #38ccff;
+	color: #fff;
+}
+
+.page-numbers {
+	color: #111;
+	border: 0px;
+	font-size: 18px;
+	padding: 6px 15px;
+}
+#myList li{ display:none;
+}
+#loadMore {
+    color:green;
+    cursor:pointer;
+}
+#loadMore:hover {
+    color:black;
+}
+#showLess {
+    color:red;
+    cursor:pointer;
+}
+#showLess:hover {
+    color:black;
+}
+
+#mega-menu-wrap-menu-1 {
+    float: right;
+}
+#mega-menu-wrap-menu-1 {
+clear: none;
+    margin-top: 20px;
+    background:transparent;
+}
+#mega-menu-wrap-menu-1 #mega-menu-menu-1 a.mega-menu-link {
+    background:transparent !important;
+
+}
+
+@media screen and (max-width: 980px) {
+#mega-menu-wrap-menu-1 .mega-menu-toggle .mega-toggle-block-1::before {
+    float: right;
+}
+#mega-menu-wrap-menu-1 {
+    width: 100%;
+}
+}
